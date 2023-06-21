@@ -198,66 +198,6 @@ def build_splits(meta_config):
 	print(f"Saving dataset to {source_file_stem}-split")
 	split_dataset.save_to_disk(os.path.join(meta_config.input_path, source_file_stem + "-split"))
 
-
-from .embedder import generate_embedded_dataset
-def build_embeddings_race(meta_config, tokenizer, model):
-	hfdss = datasets.load_dataset('race', 'all')
-	# hfdss['train'], hfdss['validation'], hfdss['test']
-
-	ged = generate_embedded_dataset(meta_config, hfdss['validation'], tokenizer, model)
-	hfds_validation_embedded = datasets.Dataset.from_dict(ged)
-	hfds_validation_embedded.save_to_disk(os.path.join(meta_config.input_path, "race_validation_embedded"))
-
-	ged = generate_embedded_dataset(meta_config, hfdss['test'], tokenizer, model)
-	hfds_test_embedded = datasets.Dataset.from_dict(ged)
-	hfds_test_embedded.save_to_disk(os.path.join(meta_config.input_path, "race_test_embedded"))
-
-	ged = generate_embedded_dataset(meta_config, hfdss['train'], tokenizer, model)
-	hfds_train_embedded = datasets.Dataset.from_dict(ged)
-	hfds_train_embedded.save_to_disk(os.path.join(meta_config.input_path, "race_train_embedded"))
-
-import torch
-def merge_race_mcq(row):
-	acc = []
-	embedding_dim = len(row['question'][0][0]) * len(row['question'][0][0][0])
-	acc.append(torch.zeros((embedding_dim,)))
-
-	acc.append(torch.tensor(row['article']).squeeze())
-	acc.append(torch.zeros((embedding_dim,)))
-	acc.append(torch.tensor(row['question']).squeeze())
-	for option in row['options'][0]:
-		acc.append(torch.zeros((embedding_dim,)))
-		for sentence in option:
-			acc.append(torch.tensor(sentence).squeeze())
-	
-	acc2 = []
-	for tensor in acc:
-		tensor2 = torch.reshape(tensor, (-1, embedding_dim))
-		acc2.append(tensor2)
-		del tensor
-	del acc
-
-	embeddings = torch.cat(acc2, dim=0)
-	attention_mask = torch.ones((embeddings.shape[0],)).bool()
-	amount_to_pad = 32 - embeddings.shape[0]
-	embeddings = torch.nn.functional.pad(embeddings, (0, 0, 0, amount_to_pad), value=0)
-	attention_mask = torch.nn.functional.pad(attention_mask, (0, amount_to_pad), value=False)
-	return {
-		'embeddings': embeddings.unsqueeze(0),
-		'attention_mask': attention_mask.unsqueeze(0),
-		'answer': torch.tensor(row['answer'], dtype=torch.long)
-	}
-
-def load_race(meta_config):
-	race_train = datasets.Dataset.load_from_disk(os.path.join(meta_config.input_path, "race_train_embedded"))
-	race_train.set_transform(merge_race_mcq)
-	race_validation = datasets.Dataset.load_from_disk(os.path.join(meta_config.input_path, "race_validation_embedded"))
-	race_validation.set_transform(merge_race_mcq)
-	race_test = datasets.Dataset.load_from_disk(os.path.join(meta_config.input_path, "race_test_embedded"))
-	race_test.set_transform(merge_race_mcq)
-	
-	return race_train, race_validation, race_test
-
 def sentence_piece_transform(meta_config, tokenizer, row):
 	assert len(row['text']) == 1
 

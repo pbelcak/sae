@@ -11,7 +11,6 @@ import wandb
 import os
 import random
 import numpy as np
-import sae_train
 
 from transformers import AutoTokenizer
 
@@ -19,6 +18,7 @@ from . import cli
 from . import data
 from .sae_model.configuration_sae import SAEConfig
 from .sae_model.modeling_sae import SAE
+from . import sae_train
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
